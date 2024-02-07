@@ -161,8 +161,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -176,11 +176,12 @@ const logoutUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .clearCookie("accessToken", options)
-    .json(new ApiResponse(200, {}, "User Logged Out"));
+    .json(new ApiResponse(200, {}, "User Logged out"));
 });
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  const incomingRefreshToken = req.cookies.refeshToken || req.body.refeshToken;
+  const incomingRefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
 
   if (!incomingRefreshToken) {
     throw new ApiError(401, "unauthorized request");
@@ -198,7 +199,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Invalid Refresh Token");
     }
 
-    if (incomingRefreshToken !== user?.refeshToken) {
+    if (incomingRefreshToken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh token is expired or used");
     }
 
@@ -279,7 +280,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-  if (avatar.url) {
+  if (!avatar.url) {
     throw new ApiError(400, "Error while uploading on avatar");
   }
 
@@ -306,7 +307,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (coverImage.url) {
+  if (!coverImage.url) {
     throw new ApiError(400, "Error while uploading on coverImage");
   }
 
@@ -327,8 +328,9 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
   const { username } = req.params;
+
   if (!username?.trim()) {
-    throw new ApiError(400, "user name is missing");
+    throw new ApiError(400, "username is missing");
   }
 
   const channel = await User.aggregate([
@@ -359,11 +361,11 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
           $size: "$subscribers",
         },
         channelsSubscribedToCount: {
-          $size: "$subscribedTo ",
+          $size: "$subscribedTo",
         },
         isSubscribed: {
           $cond: {
-            if: { $in: [req.user?._id, "subscribers.subscribers"] },
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
             then: true,
             else: false,
           },
@@ -383,14 +385,15 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
       },
     },
   ]);
+
   if (!channel?.length) {
-    throw new ApiError(404, "channel does not exist");
+    throw new ApiError(404, "channel does not exists");
   }
 
   return res
     .status(200)
     .json(
-      new ApiResponse(200, channel[0], "User Channel fetched successfully")
+      new ApiResponse(200, channel[0], "User channel fetched successfully")
     );
 });
 
